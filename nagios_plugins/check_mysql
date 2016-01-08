@@ -1,0 +1,80 @@
+#!/bin/bash
+## Author : Kuriens ##
+
+# Print usage
+
+print_usage() {
+        echo "Usage : check_mysql -u <mysql_user> -p <mysql_pass> -c <comma_separated_critical_keywords> -w <comma_separated_warning_keywords>";
+        exit 3;
+}
+
+# Getting optional mysql credentials as arguments
+
+while getopts ":u:p:w:c:" opt
+do
+        case $opt in
+                u) 
+                _USER=$OPTARG;
+                ;;
+                p)
+                _PASS=$OPTARG;
+                ;;
+                w)
+                W=$OPTARG;
+                ;;
+                c)
+                C=$OPTARG;
+                ;;
+                *)
+                echo "Invalid arguments passed"
+                print_usage;
+                ;;
+        esac
+done
+
+if [ -z "$W" ] || [ -z "$C" ]
+then
+        print_usage;
+fi
+
+# Initialize variables
+
+crt=$(echo "$C" | sed -e 's/\,/\\|/g');
+warn=$(echo "$W" | sed -e 's/\,/\\|/g');
+flag=0;
+
+## MYSQLCHECK
+
+if [ -z "$_USER" ] || [ -z "$_PASS" ]
+then
+_OUT=$(sudo mysqlcheck -s --all-databases) || exit 3;
+else
+_OUT=$(sudo mysqlcheck -u$_USER -p$_PASS -s --all-databases) || exit 3;
+fi
+
+## Conditions
+
+#CRITICAL
+echo "$_OUT" | grep -iq "$crt";
+if [ $? -eq 0 ]
+
+then
+        echo "CRITICAL : " $_OUT
+        flag=1;
+        exit 2;
+fi
+
+#WARNING
+echo "$_OUT" | grep -iq "$warn";
+if [ $? -eq 0 ]
+then
+        echo "WARNING : " $_OUT
+        flag=1;
+        exit 1;
+fi
+
+if [ ${#_OUT} -eq 0 ] || [ $flag -eq 0 ]
+then
+        echo "OK";
+        exit 0;
+fi
